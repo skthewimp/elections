@@ -2,7 +2,7 @@ require(tidyverse)
 require(arrow)
 require(readxl)
 
-bundle_dir <- "eci_assembly_results_since_2009"
+bundle_dir <- "assembly"
 data_dir <- file.path(bundle_dir, "data")
 scripts_dir <- file.path(bundle_dir, "scripts")
 manifest_path <- "eci_assembly_manifest_2021_2026.csv"

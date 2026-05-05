@@ -4,7 +4,7 @@ This repository packages a cleaned, publication-ready archive of Indian state as
 
 The release is intentionally simple:
 
-- `eci_assembly_results_since_2009/` is the distributable bundle
+- `assembly/` is the distributable bundle
 - `build_eci_assembly_bundle.R` rebuilds the bundle from the workspace sources
 - `download_eci_assembly_results.R` is the one-off ECI fetch helper
 
@@ -12,15 +12,15 @@ The release is intentionally simple:
 
 The canonical outputs live in:
 
-- `eci_assembly_results_since_2009/data/assembly_candidate_results_since_2009.parquet`
-- `eci_assembly_results_since_2009/data/assembly_candidate_results_since_2009.RData`
+- `assembly/data/assembly_candidate_results_since_2009.parquet`
+- `assembly/data/assembly_candidate_results_since_2009.RData`
 
 The current build has `161,760` candidate rows across `119` election IDs.
 
 The bundle also includes the release docs and scripts under:
 
-- `eci_assembly_results_since_2009/README.md`
-- `eci_assembly_results_since_2009/scripts/`
+- `assembly/README.md`
+- `assembly/scripts/`
 
 ## Dataset contract
 
@@ -65,16 +65,16 @@ The current bundle matches the manifest and is complete at both the election lev
 Rscript build_eci_assembly_bundle.R
 ```
 
-The build script writes the bundle to `eci_assembly_results_since_2009/` and copies the release scripts into that same folder.
+The build script writes the bundle to `assembly/` and copies the release scripts into that same folder.
 
 ## Using the data
 
 In R, read the `.RData` if you want the exact object used for publication, or read the parquet if you want the cleanest interchange format.
 
 ```r
-load("eci_assembly_results_since_2009/data/assembly_candidate_results_since_2009.RData")
+load("assembly/data/assembly_candidate_results_since_2009.RData")
 # or
-arrow::read_parquet("eci_assembly_results_since_2009/data/assembly_candidate_results_since_2009.parquet")
+arrow::read_parquet("assembly/data/assembly_candidate_results_since_2009.parquet")
 ```
 
 ## Notes

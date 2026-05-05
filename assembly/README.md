@@ -70,7 +70,7 @@ The archive is now complete for the manifest-covered election IDs and constituen
 ## Layout
 
 ```text
-eci_assembly_results_since_2009/
+assembly/
   README.md
   data/
     assembly_candidate_results_since_2009.parquet
