@@ -1,0 +1,36 @@
+download_group,election_id,election_year,election_month_label,base_url,state_type,eci_state_code,state_name,total_constituencies,output_file
+backfill,assam_2021,2021,May-2021,https://results.eci.gov.in/Result2021,S,03,Assam,126,assam_2021.csv
+backfill,kerala_2021,2021,May-2021,https://results.eci.gov.in/Result2021,S,11,Kerala,140,kerala_2021.csv
+backfill,puducherry_2021,2021,May-2021,https://results.eci.gov.in/Result2021,U,07,Puducherry,30,puducherry_2021.csv
+backfill,tamil_nadu_2021,2021,May-2021,https://results.eci.gov.in/Result2021,S,22,Tamil Nadu,234,tamil_nadu_2021.csv
+backfill,west_bengal_2021,2021,May-2021,https://results.eci.gov.in/Result2021,S,25,West Bengal,294,west_bengal_2021.csv
+backfill,goa_2022,2022,March-2022,https://results.eci.gov.in/ResultAcGenMar2022,S,05,Goa,40,goa_2022.csv
+backfill,manipur_2022,2022,March-2022,https://results.eci.gov.in/ResultAcGenMar2022,S,14,Manipur,60,manipur_2022.csv
+backfill,punjab_2022,2022,March-2022,https://results.eci.gov.in/ResultAcGenMar2022,S,19,Punjab,117,punjab_2022.csv
+backfill,uttarakhand_2022,2022,March-2022,https://results.eci.gov.in/ResultAcGenMar2022,S,24,Uttarakhand,70,uttarakhand_2022.csv
+backfill,uttar_pradesh_2022,2022,March-2022,https://results.eci.gov.in/ResultAcGenMar2022,S,28,Uttar Pradesh,403,uttar_pradesh_2022.csv
+backfill,gujarat_2022,2022,December-2022,https://results.eci.gov.in/ResultAcGenDec2022,S,06,Gujarat,182,gujarat_2022.csv
+backfill,himachal_pradesh_2022,2022,December-2022,https://results.eci.gov.in/ResultAcGenDec2022,S,08,Himachal Pradesh,68,himachal_pradesh_2022.csv
+backfill,meghalaya_2023,2023,March-2023,https://results.eci.gov.in/ResultAcGenMar2023,S,15,Meghalaya,60,meghalaya_2023.csv
+backfill,nagaland_2023,2023,March-2023,https://results.eci.gov.in/ResultAcGenMar2023,S,17,Nagaland,60,nagaland_2023.csv
+backfill,tripura_2023,2023,March-2023,https://results.eci.gov.in/ResultAcGenMar2023,S,23,Tripura,60,tripura_2023.csv
+backfill,karnataka_2023,2023,May-2023,https://results.eci.gov.in/AcResulttestGenMayNew2023,S,10,Karnataka,224,karnataka_2023.csv
+backfill,chhattisgarh_2023,2023,Dec-2023,https://results.eci.gov.in/AcResultGenDecNew2023,S,26,Chhattisgarh,90,chhattisgarh_2023.csv
+backfill,madhya_pradesh_2023,2023,Dec-2023,https://results.eci.gov.in/AcResultGenDecNew2023,S,12,Madhya Pradesh,230,madhya_pradesh_2023.csv
+backfill,mizoram_2023,2023,Dec-2023,https://results.eci.gov.in/AcResultGenDecNew2023,S,16,Mizoram,40,mizoram_2023.csv
+backfill,rajasthan_2023,2023,Dec-2023,https://results.eci.gov.in/AcResultGenDecNew2023,S,20,Rajasthan,200,rajasthan_2023.csv
+backfill,telangana_2023,2023,Dec-2023,https://results.eci.gov.in/AcResultGenDecNew2023,S,29,Telangana,119,telangana_2023.csv
+backfill,arunachal_pradesh_2024,2024,June-2024,https://results.eci.gov.in/AcResultGen2ndJune2024,S,02,Arunachal Pradesh,60,arunachal_pradesh_2024.csv
+backfill,sikkim_2024,2024,June-2024,https://results.eci.gov.in/AcResultGen2ndJune2024,S,21,Sikkim,32,sikkim_2024.csv
+backfill,andhra_pradesh_2024,2024,June-2024,https://results.eci.gov.in/AcResultGenJune2024,S,01,Andhra Pradesh,175,andhra_pradesh_2024.csv
+backfill,odisha_2024,2024,June-2024,https://results.eci.gov.in/AcResultGenJune2024,S,18,Odisha,147,odisha_2024.csv
+backfill,haryana_2024,2024,October-2024,https://results.eci.gov.in/AcResultGenOct2024,S,07,Haryana,90,haryana_2024.csv
+backfill,jammu_kashmir_2024,2024,October-2024,https://results.eci.gov.in/AcResultGenOct2024,U,08,Jammu & Kashmir,90,jammu_kashmir_2024.csv
+backfill,jharkhand_2024,2024,November-2024,https://results.eci.gov.in/ResultAcGenNov2024,S,27,Jharkhand,81,jharkhand_2024.csv
+backfill,maharashtra_2024,2024,November-2024,https://results.eci.gov.in/ResultAcGenNov2024,S,13,Maharashtra,288,maharashtra_2024.csv
+backfill,delhi_2025,2025,February-2025,https://results.eci.gov.in/ResultAcGenFeb2025,U,05,NCT of Delhi,70,delhi_2025.csv
+recent,assam_2026,2026,May-2026,https://results.eci.gov.in/ResultAcGenMay2026,S,03,Assam,126,assam_2026.csv
+recent,kerala_2026,2026,May-2026,https://results.eci.gov.in/ResultAcGenMay2026,S,11,Kerala,140,kerala_2026.csv
+recent,puducherry_2026,2026,May-2026,https://results.eci.gov.in/ResultAcGenMay2026,U,07,Puducherry,30,puducherry_2026.csv
+recent,tamil_nadu_2026,2026,May-2026,https://results.eci.gov.in/ResultAcGenMay2026,S,22,Tamil Nadu,234,tamil_nadu_2026.csv
+recent,west_bengal_2026,2026,May-2026,https://results.eci.gov.in/ResultAcGenMay2026,S,25,West Bengal,294,west_bengal_2026.csv
