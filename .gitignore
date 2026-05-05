@@ -3,10 +3,8 @@
 !/README.md
 !/build_eci_assembly_bundle.R
 !/download_eci_assembly_results.R
-!/dissemination/
-/dissemination/*
-!/dissemination/eci_assembly_results_since_2009/
-!/dissemination/eci_assembly_results_since_2009/**
+!/eci_assembly_results_since_2009/
+!/eci_assembly_results_since_2009/**
 !/eci_assembly_manifest_2021_2026.csv
 
 # Keep common local/editor clutter out of the repo.
