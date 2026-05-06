@@ -1,0 +1,810 @@
+---
+title: "May 2026 State Assembly Results"
+output: html_notebook
+---
+
+This notebook summarizes the five state assembly elections in the May 2026 batch:
+Assam, Kerala, Puducherry, Tamil Nadu, and West Bengal.
+
+```{r setup, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(scales)
+library(knitr)
+library(sf)
+
+repo_root <- "/Users/Karthik/Documents/work/elections"
+bundle_root <- file.path(repo_root, "assembly")
+
+load(file.path(bundle_root, "data", "assembly_candidate_results_since_2009.RData"))
+
+theme_elections <- function(base_size = 11) {
+  theme_minimal(base_size = base_size, base_family = "serif") %+replace%
+    theme(
+      panel.background = element_rect(fill = "#e5e1d8", colour = NA),
+      plot.background = element_rect(fill = "#e5e1d8", colour = NA),
+      panel.grid.major.y = element_line(colour = "#c8c0aa", linewidth = 0.25),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.title = element_text(face = "bold", colour = "#3C3C3C"),
+      axis.text = element_text(colour = "#3C3C3C"),
+      plot.title = element_text(face = "bold", colour = "#3C3C3C"),
+      plot.subtitle = element_text(colour = "#3C3C3C"),
+      strip.text = element_text(face = "bold", colour = "#3C3C3C"),
+      legend.position = "none"
+    )
+}
+
+safe_corners <- function(v) {
+  v <- replace_na(as.numeric(v), 0)
+  total <- sum(v, na.rm = TRUE)
+  if (is.na(total) || total <= 0) {
+    return(NA_real_)
+  }
+  1 / sum((v / total)^2)
+}
+
+normalize_party <- function(party) {
+  p <- str_squish(as.character(party))
+
+  case_when(
+    p %in% c("IND", "Independent") ~ "Independent",
+    p %in% c("BJP") ~ "Bharatiya Janata Party",
+    p %in% c("INC") ~ "Indian National Congress",
+    p %in% c("AGP") ~ "Asom Gana Parishad",
+    p %in% c("BPF") ~ "Bodoland Peoples Front",
+    p %in% c("AJP") ~ "Assam Jatiya Parishad",
+    p %in% c("AIUDF") ~ "All India United Democratic Front",
+    p %in% c("CPM", "CPI(M)") ~ "Communist Party of India (Marxist)",
+    p %in% c("CPI") ~ "Communist Party of India",
+    p %in% c("SUCI") ~ "Socialist Unity Centre of India (Communist)",
+    p %in% c("AITC") ~ "All India Trinamool Congress",
+    p %in% c("ADMK", "AIADMK") ~ "All India Anna Dravida Munnetra Kazhagam",
+    p %in% c("DMK") ~ "Dravida Munnetra Kazhagam",
+    p %in% c("NTK") ~ "Naam Tamilar Katchi",
+    p %in% c("MNM") ~ "Makkal Needhi Maiam",
+    p %in% c("AMMK") ~ "Amma Makkal Munnettra Kazagam",
+    p %in% c("DMDK") ~ "Desiya Murpokku Dravida Kazhagam",
+    p %in% c("PMK") ~ "Pattali Makkal Katchi",
+    p %in% c("VCK") ~ "Viduthalai Chiruthaigal Katchi",
+    p %in% c("IUML") ~ "Indian Union Muslim League",
+    p %in% c("JD(S)") ~ "Janata Dal (Secular)",
+    p %in% c("JD(U)") ~ "Janata Dal (United)",
+    p %in% c("RSP") ~ "Revolutionary Socialist Party",
+    p %in% c("AIFB") ~ "All India Forward Bloc",
+    p %in% c("AINRC") ~ "All India N.R. Congress",
+    p %in% c("BJP+AGP") ~ "Bharatiya Janata Party",
+    TRUE ~ p
+  )
+}
+
+state_map_path <- function(state_name) {
+  folder <- case_when(
+    state_name == "Assam" ~ "assam",
+    state_name == "Kerala" ~ "kerala",
+    state_name == "Puducherry" ~ "puducherry",
+    state_name == "Tamil Nadu" ~ "tamilnadu",
+    state_name == "West Bengal" ~ "westbengal",
+    TRUE ~ NA_character_
+  )
+  file.path(repo_root, "maps", folder, paste0(folder, ".assembly.shp"))
+}
+
+constituency_region <- function(state_name, constituency_name, lon, lat) {
+  case_when(
+    state_name == "Assam" & lat < 25.0 & lon > 92.2 ~ "Barak Valley",
+    state_name == "Assam" & lat > 26.5 & lon > 92.2 ~ "Upper Assam",
+    state_name == "Assam" & lon < 91.7 & lat < 26.6 ~ "Lower Assam",
+    state_name == "Assam" & lat > 26.2 & lon < 91.9 ~ "North Assam",
+    state_name == "Assam" ~ "Central Assam",
+
+    state_name == "Kerala" & lat > 11.1 ~ "Malabar",
+    state_name == "Kerala" & lat > 10.0 ~ "Kochi",
+    state_name == "Kerala" ~ "Travancore",
+
+    state_name == "Puducherry" & lon < 76.5 ~ "Mahe",
+    state_name == "Puducherry" & lon > 81.0 ~ "Yanam",
+    state_name == "Puducherry" & lat < 11.1 ~ "Karaikal",
+    state_name == "Puducherry" ~ "Puducherry",
+
+    state_name == "Tamil Nadu" & lat > 12.2 & lon > 79.8 ~ "Chennai",
+    state_name == "Tamil Nadu" & lon < 78.7 & lat > 10.7 ~ "Kongu",
+    state_name == "Tamil Nadu" & lat < 10.5 ~ "South",
+    state_name == "Tamil Nadu" & lon > 78.6 & lon < 79.8 & lat > 10.6 ~ "Delta",
+    state_name == "Tamil Nadu" ~ "North",
+
+    state_name == "West Bengal" & lat > 25.0 ~ "North Bengal",
+    state_name == "West Bengal" & lon < 87.8 & lat < 23.5 ~ "Jungle Mahal",
+    state_name == "West Bengal" & lon >= 88.0 & lon <= 88.6 & lat >= 22.2 & lat <= 22.9 ~ "Kolkata",
+    state_name == "West Bengal" & lon < 88.8 & lat >= 23.0 & lat <= 24.6 ~ "Rarh",
+    state_name == "West Bengal" ~ "South Bengal",
+
+    TRUE ~ "Other"
+  )
+}
+```
+
+## Load the election data
+
+I start with the two batches I need for the comparison - May 2021 and May 2026 - and then build the state lookup from the shapefiles.
+
+```{r load-election-data}
+may2026_ids <- c(
+  "assam_2026",
+  "kerala_2026",
+  "puducherry_2026",
+  "tamil_nadu_2026",
+  "west_bengal_2026"
+)
+
+assembly_candidate_results %>%
+  filter(election_id %in% may2026_ids) %>%
+  mutate(party = normalize_party(party)) %>%
+  mutate(
+    state_name = factor(
+      state_name,
+      levels = c("Assam", "Kerala", "Puducherry", "Tamil Nadu", "West Bengal")
+    )
+  ) -> may2026
+
+assembly_candidate_results %>%
+  filter(election_id %in% paste0(c("assam", "kerala", "puducherry", "tamil_nadu", "west_bengal"), "_2021")) %>%
+  mutate(
+    party = normalize_party(party),
+    state_name = factor(
+      state_name,
+      levels = c("Assam", "Kerala", "Puducherry", "Tamil Nadu", "West Bengal")
+    )
+  ) -> may2021
+
+map_dfr(levels(may2026$state_name), function(st) {
+  map_path <- state_map_path(st)
+  if (!file.exists(map_path)) {
+    return(tibble())
+  }
+
+  st_read(map_path, quiet = TRUE) %>%
+    mutate(
+      lon = st_coordinates(st_point_on_surface(geometry))[, 1],
+      lat = st_coordinates(st_point_on_surface(geometry))[, 2],
+      region = constituency_region(state, ac_name, lon, lat)
+    ) %>%
+    st_drop_geometry() %>%
+    transmute(
+      state_name = st,
+      constituency_no = as.integer(ac),
+      constituency_name = ac_name,
+      region = region
+    ) %>%
+    distinct()
+}) -> state_region_lookup
+
+map_dfr(levels(may2026$state_name), function(st) {
+  map_path <- state_map_path(st)
+  if (!file.exists(map_path)) {
+    return(tibble())
+  }
+
+  st_read(map_path, quiet = TRUE) %>%
+    mutate(
+      state_name = state,
+      constituency_no = as.integer(ac),
+      constituency_name = ac_name,
+      lon = st_coordinates(st_point_on_surface(geometry))[, 1],
+      lat = st_coordinates(st_point_on_surface(geometry))[, 2],
+      region = constituency_region(state, ac_name, lon, lat)
+    ) %>%
+    select(state_name, constituency_no, constituency_name, region, geometry)
+}) -> assembly_shapes
+```
+
+## Seat and vote summaries
+
+This block is the boring plumbing, but it is the part I always want available quickly when I am exploring an election. Seats, vote shares, margins, close seats, and a rough corners-of-contest measure.
+
+```{r seat-vote-summaries}
+may2026 %>%
+  group_by(state_name, constituency_no, constituency_name) %>%
+  arrange(desc(total_votes), .by_group = TRUE) %>%
+  summarise(
+    winner = first(candidate),
+    winner_party = first(party),
+    runnerup = if (n() >= 2) nth(candidate, 2) else NA_character_,
+    runnerup_party = if (n() >= 2) nth(party, 2) else NA_character_,
+    winner_votes = first(total_votes),
+    runnerup_votes = if (n() >= 2) nth(total_votes, 2) else NA_real_,
+    margin = if (n() >= 2) winner_votes - runnerup_votes else NA_real_,
+    corners = safe_corners(total_votes),
+    .groups = "drop"
+  ) -> seat_results
+
+seat_results %>%
+  count(state_name, winner_party, name = "seats") %>%
+  arrange(state_name, desc(seats), winner_party) -> seat_tally
+
+may2026 %>%
+  group_by(state_name, party) %>%
+  summarise(votes = sum(total_votes, na.rm = TRUE), .groups = "drop") %>%
+  group_by(state_name) %>%
+  mutate(vote_share = votes / sum(votes, na.rm = TRUE)) %>%
+  ungroup() %>%
+  arrange(state_name, desc(vote_share), party) -> vote_tally
+
+seat_results %>%
+  group_by(state_name) %>%
+  summarise(
+    seats = n(),
+    avg_corners = mean(corners, na.rm = TRUE),
+    median_margin = median(margin, na.rm = TRUE),
+    close_5k = sum(margin <= 5000, na.rm = TRUE),
+    closest_margin = min(margin, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  left_join(
+    seat_tally %>%
+      group_by(state_name) %>%
+      slice_max(seats, n = 1, with_ties = FALSE) %>%
+      ungroup() %>%
+      transmute(
+        state_name,
+        seat_leader = winner_party,
+        seat_leader_seats = seats
+      ),
+    by = "state_name"
+  ) %>%
+  left_join(
+    vote_tally %>%
+      group_by(state_name) %>%
+      slice_max(vote_share, n = 1, with_ties = FALSE) %>%
+      ungroup() %>%
+      transmute(
+        state_name,
+        vote_leader = party,
+        vote_leader_share = vote_share
+      ),
+    by = "state_name"
+  ) %>%
+  mutate(
+    seat_leader_share = seat_leader_seats / seats,
+    avg_corners = round(avg_corners, 1)
+  ) %>%
+  transmute(
+    State = state_name,
+    `Seat leader` = sprintf("%s (%d/%d)", seat_leader, seat_leader_seats, seats),
+    `Vote leader` = sprintf("%s (%s)", vote_leader, percent(vote_leader_share, accuracy = 0.1)),
+    `Median margin` = comma(median_margin),
+    `Seats < 5k` = close_5k,
+    `Closest seat` = comma(closest_margin),
+    `Avg corners` = avg_corners
+  )
+```
+
+## Alliance summaries
+
+This is the part where I stop thinking in parties and start thinking in blocs. For these five states, that is the right level of aggregation.
+
+```{r alliance-summaries}
+may2021_alliance <- may2021 %>%
+  mutate(alliance = party_to_alliance(as.character(state_name), party))
+
+may2026_alliance <- may2026 %>%
+  mutate(alliance = party_to_alliance(as.character(state_name), party))
+
+may2021_alliance %>%
+  group_by(state_name, constituency_no, constituency_name) %>%
+  arrange(desc(total_votes), .by_group = TRUE) %>%
+  summarise(
+    winner = first(candidate),
+    winner_party = first(party),
+    winner_alliance = first(alliance),
+    runnerup = if (n() >= 2) nth(candidate, 2) else NA_character_,
+    runnerup_party = if (n() >= 2) nth(party, 2) else NA_character_,
+    runnerup_alliance = if (n() >= 2) nth(alliance, 2) else NA_character_,
+    winner_votes = first(total_votes),
+    runnerup_votes = if (n() >= 2) nth(total_votes, 2) else NA_real_,
+    margin = if (n() >= 2) winner_votes - runnerup_votes else NA_real_,
+    corners = safe_corners(total_votes),
+    .groups = "drop"
+  ) -> alliance_results_2021
+
+may2026_alliance %>%
+  group_by(state_name, constituency_no, constituency_name) %>%
+  arrange(desc(total_votes), .by_group = TRUE) %>%
+  summarise(
+    winner = first(candidate),
+    winner_party = first(party),
+    winner_alliance = first(alliance),
+    runnerup = if (n() >= 2) nth(candidate, 2) else NA_character_,
+    runnerup_party = if (n() >= 2) nth(party, 2) else NA_character_,
+    runnerup_alliance = if (n() >= 2) nth(alliance, 2) else NA_character_,
+    winner_votes = first(total_votes),
+    runnerup_votes = if (n() >= 2) nth(total_votes, 2) else NA_real_,
+    margin = if (n() >= 2) winner_votes - runnerup_votes else NA_real_,
+    corners = safe_corners(total_votes),
+    .groups = "drop"
+  ) -> alliance_results
+
+alliance_results %>%
+  count(state_name, winner_alliance, name = "seats") %>%
+  arrange(state_name, desc(seats), winner_alliance) -> alliance_tally
+
+may2026_alliance %>%
+  group_by(state_name, alliance) %>%
+  summarise(votes = sum(total_votes, na.rm = TRUE), .groups = "drop") %>%
+  group_by(state_name) %>%
+  mutate(vote_share = votes / sum(votes, na.rm = TRUE)) %>%
+  ungroup() %>%
+  arrange(state_name, desc(vote_share), alliance) -> alliance_vote_tally
+
+alliance_results %>%
+  group_by(state_name) %>%
+  summarise(
+    seats = n(),
+    avg_corners = mean(corners, na.rm = TRUE),
+    median_margin = median(margin, na.rm = TRUE),
+    close_5k = sum(margin <= 5000, na.rm = TRUE),
+    close_10k = sum(margin <= 10000, na.rm = TRUE),
+    closest_margin = min(margin, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  left_join(
+    alliance_tally %>%
+      group_by(state_name) %>%
+      slice_max(seats, n = 1, with_ties = FALSE) %>%
+      ungroup() %>%
+      transmute(
+        state_name,
+        seat_leader = winner_alliance,
+        seat_leader_seats = seats
+      ),
+    by = "state_name"
+  ) %>%
+  left_join(
+    alliance_vote_tally %>%
+      group_by(state_name) %>%
+      slice_max(vote_share, n = 1, with_ties = FALSE) %>%
+      ungroup() %>%
+      transmute(
+        state_name,
+        vote_leader = alliance,
+        vote_leader_share = vote_share
+      ),
+    by = "state_name"
+  ) %>%
+  mutate(
+    seat_leader_share = seat_leader_seats / seats,
+    avg_corners = round(avg_corners, 1)
+  ) -> alliance_summary
+
+alliance_results %>%
+  arrange(margin, state_name, constituency_no) %>%
+  group_by(state_name) %>%
+  slice_head(n = 5) %>%
+  ungroup() -> alliance_close
+```
+
+## Swings and corners
+
+This is the section that tends to produce the real story. Where did the vote move from 2021? Which regions are doing the heavy lifting? Which states are becoming cleaner fights, and which are getting messier?
+
+```{r swings-and-corners}
+bind_rows(
+  alliance_results_2021 %>% mutate(batch = "2021"),
+  alliance_results %>% mutate(batch = "2026")
+) %>%
+  count(batch, state_name, winner_alliance, name = "seats") %>%
+  pivot_wider(names_from = batch, values_from = seats, values_fill = 0) %>%
+  mutate(seat_change = `2026` - `2021`) %>%
+  arrange(state_name, desc(seat_change)) -> seat_swing
+
+bind_rows(
+  may2021_alliance %>% mutate(batch = "2021"),
+  may2026_alliance %>% mutate(batch = "2026")
+) %>%
+  group_by(batch, state_name, alliance) %>%
+  summarise(votes = sum(total_votes, na.rm = TRUE), .groups = "drop") %>%
+  group_by(batch, state_name) %>%
+  mutate(vote_share = votes / sum(votes, na.rm = TRUE)) %>%
+  ungroup() %>%
+  select(batch, state_name, alliance, votes, vote_share) %>%
+  pivot_wider(
+    names_from = batch,
+    values_from = c(votes, vote_share),
+    values_fill = 0
+  ) %>%
+  mutate(
+    vote_share_pp = 100 * (vote_share_2026 - vote_share_2021),
+    vote_change = votes_2026 - votes_2021
+  ) %>%
+  arrange(state_name, desc(vote_share_pp)) -> state_swing
+
+bind_rows(
+  may2021_alliance %>% mutate(batch = "2021"),
+  may2026_alliance %>% mutate(batch = "2026")
+) %>%
+  left_join(state_region_lookup, by = c("state_name", "constituency_no")) %>%
+  filter(!is.na(region)) %>%
+  group_by(batch, state_name, region, alliance) %>%
+  summarise(votes = sum(total_votes, na.rm = TRUE), .groups = "drop") %>%
+  group_by(batch, state_name, region) %>%
+  mutate(vote_share = votes / sum(votes, na.rm = TRUE)) %>%
+  ungroup() %>%
+  select(batch, state_name, region, alliance, vote_share) %>%
+  pivot_wider(names_from = batch, values_from = vote_share, values_fill = 0) %>%
+  mutate(vote_share_pp = 100 * (`2026` - `2021`)) -> region_swing
+
+alliance_results %>%
+  left_join(state_region_lookup, by = c("state_name", "constituency_no")) %>%
+  group_by(state_name, region) %>%
+  summarise(
+    seats = n(),
+    avg_corners = mean(corners, na.rm = TRUE),
+    median_margin = median(margin, na.rm = TRUE),
+    close_5k = sum(margin <= 5000, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(state_name, desc(avg_corners), median_margin) -> corner_by_region
+
+alliance_results %>%
+  left_join(state_region_lookup, by = c("state_name", "constituency_no")) %>%
+  group_by(state_name, region) %>%
+  summarise(
+    seats = n(),
+    avg_corners = mean(corners, na.rm = TRUE),
+    median_margin = median(margin, na.rm = TRUE),
+    close_5k = sum(margin <= 5000, na.rm = TRUE),
+    .groups = "drop"
+  ) -> region_summary
+
+bind_rows(
+  may2021_alliance %>% mutate(batch = "2021"),
+  may2026_alliance %>% mutate(batch = "2026")
+) %>%
+  group_by(batch, state_name, constituency_no, constituency_name) %>%
+  summarise(
+    corners = round(safe_corners(total_votes)),
+    winner_alliance = first(alliance),
+    runnerup_alliance = if (n() >= 2) nth(alliance, 2) else NA_character_,
+    .groups = "drop"
+  ) -> contest_corners
+
+contest_corners %>%
+  count(batch, state_name, corners, name = "seats") %>%
+  arrange(state_name, batch, corners) -> corner_distribution
+
+contest_corners %>%
+  filter(corners == 2) %>%
+  count(batch, state_name, winner_alliance, runnerup_alliance, sort = TRUE) -> two_corner_outcomes
+
+focus_alliances <- list(
+  "Assam" = c("NDA", "INDIA"),
+  "Kerala" = c("UDF", "LDF"),
+  "Puducherry" = c("NDA", "INDIA"),
+  "Tamil Nadu" = c("TVK", "DMK-led", "AIADMK-led"),
+  "West Bengal" = c("BJP", "TMC", "Left-Congress")
+)
+```
+
+## Geography note
+
+I am not using districts here. The regional buckets come from assembly-constituency geography, which is the level that actually matters for the election map:
+
+- Assam: North, Lower, Upper, Barak Valley, Central
+- Kerala: Malabar, Kochi, Travancore
+- Puducherry: Puducherry, Karaikal, Mahe, Yanam
+- Tamil Nadu: Chennai, North, Kongu, Delta, South
+- West Bengal: North Bengal, Kolkata, Jungle Mahal, Rarh, South Bengal
+
+```{r region-check}
+state_region_lookup %>%
+  count(state_name, region, name = "constituencies") %>%
+  arrange(state_name, desc(constituencies), region)
+```
+
+## Alliance headline
+
+```{r headline-table, echo=FALSE}
+alliance_summary %>%
+  transmute(
+    State = state_name,
+    `Seat leader` = sprintf("%s (%d/%d)", seat_leader, seat_leader_seats, seats),
+    `Vote leader` = sprintf("%s (%s)", vote_leader, percent(vote_leader_share, accuracy = 0.1)),
+    `Median margin` = comma(median_margin),
+    `Seats < 5k` = close_5k,
+    `Closest seat` = comma(closest_margin),
+    `Avg corners` = avg_corners
+  )
+```
+
+This batch is not uniform. Assam and West Bengal are lopsided once you group the parties into blocs, while Kerala, Puducherry, and especially Tamil Nadu stay much more competitive at the alliance level.
+
+```{r swing-plot, fig.width=10, fig.height=8}
+state_swing %>%
+  filter(alliance != "Other") %>%
+  mutate(
+    state_name = fct_rev(state_name),
+    alliance = fct_reorder(alliance, vote_share_pp)
+  ) %>%
+  ggplot(aes(x = vote_share_pp, y = alliance, fill = vote_share_pp > 0)) +
+  geom_col(width = 0.7) +
+  facet_wrap(~ state_name, scales = "free_y", ncol = 1) +
+  scale_fill_manual(values = c("TRUE" = "#5f3946", "FALSE" = "#9c9280"), guide = "none") +
+  geom_vline(xintercept = 0, colour = "#3C3C3C", linewidth = 0.3) +
+  labs(
+    title = "Alliance vote-share swing from 2021 to 2026",
+    subtitle = "Positive bars are gains; negative bars are losses",
+    x = "Vote-share swing, percentage points",
+    y = NULL
+  ) +
+  theme_elections()
+```
+
+```{r constituency-map-margin, fig.width=10, fig.height=9}
+assembly_shapes %>%
+  left_join(
+    alliance_results %>%
+      select(state_name, constituency_no, margin, corners),
+    by = c("state_name", "constituency_no")
+  ) %>%
+  ggplot(aes(fill = margin)) +
+  geom_sf(colour = "#e5e1d8", linewidth = 0.12) +
+  facet_wrap(~ state_name, ncol = 1, scales = "free") +
+  scale_fill_gradient(
+    low = "#efe8dd",
+    high = "#5f3946",
+    trans = "sqrt",
+    labels = comma,
+    na.value = "#d8d1c4"
+  ) +
+  labs(
+    title = "Constituency-level winning margins",
+    subtitle = "Darker constituencies are safer; pale constituencies are closer fights",
+    fill = "Margin"
+  ) +
+  theme_elections() +
+  theme(legend.position = "bottom")
+```
+
+```{r constituency-map-corners, fig.width=10, fig.height=9}
+assembly_shapes %>%
+  left_join(
+    alliance_results %>%
+      select(state_name, constituency_no, margin, corners),
+    by = c("state_name", "constituency_no")
+  ) %>%
+  ggplot(aes(fill = corners)) +
+  geom_sf(colour = "#e5e1d8", linewidth = 0.12) +
+  facet_wrap(~ state_name, ncol = 1, scales = "free") +
+  scale_fill_gradient(
+    low = "#f1ebe1",
+    high = "#7b3f55",
+    labels = number_format(accuracy = 0.1),
+    na.value = "#d8d1c4"
+  ) +
+  labs(
+    title = "Constituency-level contest fragmentation",
+    subtitle = "Higher values mean more crowded and less binary contests",
+    fill = "Corners"
+  ) +
+  theme_elections() +
+  theme(legend.position = "bottom")
+```
+
+## Contest corners
+
+The old notebooks always end up here for a reason: the number of straight fights, three-cornered seats, and crowded contests changes the way swings should be read. In this batch, Assam and West Bengal move toward cleaner head-to-head contests, while Puducherry and Tamil Nadu get more fragmented.
+
+```{r corner-plot, fig.width=10, fig.height=8}
+corner_distribution %>%
+  filter(corners <= 5) %>%
+  mutate(
+    batch = factor(batch, levels = c("2021", "2026")),
+    state_name = fct_rev(state_name),
+    corners = factor(corners, levels = c(2, 3, 4, 5))
+  ) %>%
+  ggplot(aes(x = corners, y = seats, fill = batch)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.65) +
+  facet_wrap(~ state_name, scales = "free_y", ncol = 1) +
+  scale_fill_manual(values = c("2021" = "#9c9280", "2026" = "#5f3946")) +
+  labs(
+    title = "Contest corners by state",
+    subtitle = "ENPV rounded to the nearest whole number; 2 is a straight fight",
+    x = "Corners",
+    y = "Seats",
+    fill = NULL
+  ) +
+  theme_elections()
+```
+
+```{r corner-table, echo=FALSE}
+corner_distribution %>%
+  filter(corners <= 5) %>%
+  mutate(
+    batch = factor(batch, levels = c("2021", "2026")),
+    corners = paste0(corners, "-cornered")
+  ) %>%
+  pivot_wider(names_from = batch, values_from = seats, values_fill = 0) %>%
+  arrange(state_name, corners) %>%
+  transmute(
+    State = state_name,
+    `Contest type` = corners,
+    `2021` = `2021`,
+    `2026` = `2026`,
+    `Change` = `2026` - `2021`
+  )
+```
+
+```{r two-cornered, echo=FALSE}
+two_corner_outcomes %>%
+  filter(batch == "2026") %>%
+  group_by(state_name) %>%
+  slice_max(n, n = 4, with_ties = FALSE) %>%
+  ungroup() %>%
+  transmute(
+    State = state_name,
+    `Winner alliance` = winner_alliance,
+    `Runner-up alliance` = runnerup_alliance,
+    Seats = n
+  )
+```
+
+```{r seat-plot, fig.width=9.5, fig.height=8}
+alliance_tally %>%
+  mutate(
+    state_name = fct_rev(state_name),
+    winner_alliance = fct_reorder(winner_alliance, seats)
+  ) %>%
+  ggplot(aes(x = seats, y = winner_alliance)) +
+  geom_col(fill = "#5f3946") +
+  geom_text(aes(label = seats), hjust = -0.15, size = 3, colour = "#3C3C3C") +
+  facet_wrap(~ state_name, scales = "free_y", ncol = 1) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(
+    title = "Winning alliances by state",
+    subtitle = "Top seat-winning blocs in each May 2026 state election",
+    x = "Seats won",
+    y = NULL
+  ) +
+  theme_elections()
+```
+
+```{r close-overall, echo=FALSE}
+alliance_results %>%
+  arrange(margin, state_name, constituency_no) %>%
+  select(state_name, constituency_name, winner, winner_alliance, runnerup, runnerup_alliance, winner_votes, runnerup_votes, margin) %>%
+  slice_head(n = 10) %>%
+  mutate(
+    `Winner` = paste0(winner, " (", winner_alliance, ")"),
+    `Runner-up` = paste0(runnerup, " (", runnerup_alliance, ")"),
+    `Winner votes` = comma(winner_votes),
+    `Runner-up votes` = comma(runnerup_votes),
+    `Margin` = comma(margin)
+  ) %>%
+  select(State = state_name, Constituency = constituency_name, Winner, `Runner-up`, `Winner votes`, `Runner-up votes`, Margin)
+```
+
+Falta in West Bengal is the odd one out: the source records the top two candidates on equal votes, so it behaves like a true tie in the table above.
+
+## Alliance Notes
+
+I use a state-specific bloc map here, because the cleanest political story is not the same in every state:
+
+- Assam: NDA / INDIA / Other
+- Kerala: UDF / LDF / NDA / Other
+- Puducherry: NDA / INDIA / Other
+- Tamil Nadu: TVK / DMK-led / AIADMK-led / BJP / Other
+- West Bengal: BJP / TMC / Left-Congress / Other
+
+```{r state-notes, results='asis'}
+for (st in levels(may2026$state_name)) {
+  alliance_summary %>% filter(state_name == st) -> ss
+  cat("### ", st, "\n\n", sep = "")
+  cat(sprintf(
+    "%s leads the seats with %d of %d and also leads vote share with %s. The median winning margin is %s, and %d constituencies were decided by less than 5,000 votes.\n\n",
+    ss$seat_leader,
+    ss$seat_leader_seats,
+    ss$seats,
+    percent(ss$vote_leader_share, accuracy = 0.1),
+    comma(ss$median_margin),
+    ss$close_5k
+  ))
+
+  cat("Top seat winners:\n\n")
+  alliance_tally %>%
+    filter(state_name == st) %>%
+    mutate(
+      winner_alliance = fct_reorder(winner_alliance, seats),
+      Share = percent(seats / sum(seats), accuracy = 0.1)
+    ) %>%
+    select(Alliance = winner_alliance, Seats = seats, Share) %>%
+    print()
+  cat("\n\n")
+
+  cat("Top vote-share alliances:\n\n")
+  alliance_vote_tally %>%
+    filter(state_name == st) %>%
+    mutate(
+      alliance = fct_reorder(alliance, vote_share),
+      Share = percent(vote_share, accuracy = 0.1)
+    ) %>%
+    select(Alliance = alliance, Votes = votes, Share) %>%
+    print()
+  cat("\n\n")
+
+  cat("Swing since 2021:\n\n")
+  state_swing %>%
+    filter(state_name == st) %>%
+    mutate(
+      Alliance = alliance,
+      `2021 vote share` = percent(vote_share_2021, accuracy = 0.1),
+      `2026 vote share` = percent(vote_share_2026, accuracy = 0.1),
+      `Swing (pp)` = round(vote_share_pp, 1)
+    ) %>%
+    select(Alliance, `2021 vote share`, `2026 vote share`, `Swing (pp)`) %>%
+    print()
+  cat("\n\n")
+
+  cat("Seat swing since 2021:\n\n")
+  seat_swing %>%
+    filter(state_name == st) %>%
+    mutate(
+      Alliance = winner_alliance,
+      `2021 seats` = `2021`,
+      `2026 seats` = `2026`,
+      `Seat swing` = seat_change
+    ) %>%
+    select(Alliance, `2021 seats`, `2026 seats`, `Seat swing`) %>%
+    print()
+  cat("\n\n")
+
+  cat("Regional swing hotspots:\n\n")
+  region_swing %>%
+    filter(state_name == st, alliance %in% focus_alliances[[as.character(st)]]) %>%
+    arrange(desc(abs(vote_share_pp))) %>%
+    slice_head(n = 6) %>%
+    transmute(
+      Region = region,
+      Alliance = alliance,
+      `2021 share` = percent(`2021`, accuracy = 0.1),
+      `2026 share` = percent(`2026`, accuracy = 0.1),
+      `Swing (pp)` = round(vote_share_pp, 1)
+    ) %>%
+    print()
+  cat("\n\n")
+
+  cat("Most fragmented regions:\n\n")
+  corner_by_region %>%
+    filter(state_name == st) %>%
+    slice_head(n = 5) %>%
+    transmute(
+      Region = region,
+      Seats = seats,
+      `Avg corners` = round(avg_corners, 1),
+      `Median margin` = comma(median_margin),
+      `Seats < 5k` = close_5k
+  ) %>%
+    print()
+  cat("\n\n")
+
+  cat("Closest constituencies:\n\n")
+  alliance_close %>%
+    filter(state_name == st) %>%
+    transmute(
+      Constituency = constituency_name,
+      Winner = paste0(winner, " (", winner_party, ")"),
+      Runner_up = paste0(runnerup, " (", runnerup_party, ")"),
+      Margin = comma(margin)
+    ) %>%
+    print()
+  cat("\n\n")
+}
+```
+
+## First reading
+
+This is the first pass, not the last word. The state-level bloc tables and the region swing/corner checks are the bits I would trust most at this stage.
+
+- Assam is the clearest NDA versus INDIA contest in the batch. NDA finishes with 102 of 126 seats and 48.0% of the vote, but INDIA still clears 41.0%, so the opposition remains substantial even in a lopsided assembly map. The real movement is region-led, not random.
+- Kerala remains a true UDF versus LDF fight. UDF leads with 95 of 140 seats and 43.4% of the vote, while LDF is still a meaningful second pole and the seat margins stay competitive.
+- Puducherry is fragmented and very tight. NDA edges out the field with 16 seats and 35.3% of the vote, but INDIA and Other blocs are both large enough that the assembly feels unstable.
+- Tamil Nadu is the most multipolar of the five states. TVK is the largest bloc on seats, but DMK-led and AIADMK-led forces are close behind, which makes this the most crowded bloc map in the batch. The region maps matter more than the seat tally here.
+- West Bengal is the most seat-heavy result in the batch. BJP leads both seats and vote share, TMC is the only serious counterweight, and the Left-Congress pool still matters in the competitive seats. The real story is the split between North Bengal, Rarh, Kolkata, Jungle Mahal, and the south.
