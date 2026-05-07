@@ -12,10 +12,33 @@ library(scales)
 library(knitr)
 library(sf)
 
-repo_root <- "/Users/Karthik/Documents/work/elections"
+find_repo_root <- function(start_path = getwd()) {
+  current <- normalizePath(start_path, mustWork = TRUE)
+
+  repeat {
+    if (
+      file.exists(file.path(current, "README.md")) &&
+        dir.exists(file.path(current, "assembly"))
+    ) {
+      return(current)
+    }
+
+    parent <- dirname(current)
+    if (identical(parent, current)) {
+      stop("Could not locate repo root from the current working directory.")
+    }
+    current <- parent
+  }
+}
+
+repo_root <- find_repo_root()
 bundle_root <- file.path(repo_root, "assembly")
 
-load(file.path(bundle_root, "data", "assembly_candidate_results_since_2009.RData"))
+load(file.path(
+  bundle_root,
+  "data",
+  "assembly_candidate_results_since_2009.RData"
+))
 
 theme_elections <- function(base_size = 11) {
   theme_minimal(base_size = base_size, base_family = "serif") %+replace%
@@ -77,6 +100,122 @@ normalize_party <- function(party) {
   )
 }
 
+party_to_alliance <- function(state_name, party) {
+  case_when(
+    # Assam: NDA vs INDIA vs Other
+    state_name == "Assam" &
+      party %in%
+        c(
+          "Bharatiya Janata Party",
+          "Asom Gana Parishad",
+          "Bodoland Peoples Front",
+          "United Peoples Party Liberal"
+        ) ~ "NDA",
+    state_name == "Assam" &
+      party %in%
+        c(
+          "Indian National Congress",
+          "All India United Democratic Front",
+          "Communist Party of India (Marxist)",
+          "Communist Party of India",
+          "Assam Jatiya Parishad",
+          "Raijor Dal"
+        ) ~ "INDIA",
+    state_name == "Assam" ~ "Other",
+
+    # Kerala: UDF vs LDF vs NDA vs Other
+    state_name == "Kerala" &
+      party %in%
+        c(
+          "Indian National Congress",
+          "Indian Union Muslim League",
+          "Kerala Congress (M)",
+          "Kerala Congress",
+          "Revolutionary Socialist Party of Kerala"
+        ) ~ "UDF",
+    state_name == "Kerala" &
+      party %in%
+        c(
+          "Communist Party of India (Marxist)",
+          "Communist Party of India",
+          "Indian National League",
+          "Janata Dal (Secular)",
+          "Nationalist Congress Party",
+          "All India Forward Bloc",
+          "Revolutionary Socialist Party",
+          "Kerala Congress (B)",
+          "Socialist Unity Centre of India (Communist)"
+        ) ~ "LDF",
+    state_name == "Kerala" & party %in% c("Bharatiya Janata Party") ~ "NDA",
+    state_name == "Kerala" ~ "Other",
+
+    # Puducherry: NDA vs INDIA vs Other
+    state_name == "Puducherry" &
+      party %in%
+        c(
+          "All India N.R. Congress",
+          "Bharatiya Janata Party",
+          "All India Anna Dravida Munnetra Kazhagam"
+        ) ~ "NDA",
+    state_name == "Puducherry" &
+      party %in%
+        c(
+          "Indian National Congress",
+          "Dravida Munnetra Kazhagam"
+        ) ~ "INDIA",
+    state_name == "Puducherry" ~ "Other",
+
+    # Tamil Nadu: TVK vs DMK-led vs AIADMK-led vs BJP vs Other
+    state_name == "Tamil Nadu" &
+      party %in%
+        c(
+          "Tamilaga Vettri Kazhagam"
+        ) ~ "TVK",
+    state_name == "Tamil Nadu" &
+      party %in%
+        c(
+          "Dravida Munnetra Kazhagam",
+          "Indian National Congress",
+          "Communist Party of India (Marxist)",
+          "Communist Party of India",
+          "Viduthalai Chiruthaigal Katchi",
+          "Indian Union Muslim League",
+          "Marumalarchi Dravida Munnetra Kazhagam",
+          "Kongunadu Makkal Desia Katchi"
+        ) ~ "DMK-led",
+    state_name == "Tamil Nadu" &
+      party %in%
+        c(
+          "All India Anna Dravida Munnetra Kazhagam",
+          "Pattali Makkal Katchi",
+          "Desiya Murpokku Dravida Kazhagam",
+          "Tamil Maanila Congress (Moopanar)",
+          "Amma Makkal Munnettra Kazagam"
+        ) ~ "AIADMK-led",
+    state_name == "Tamil Nadu" & party %in% c("Bharatiya Janata Party") ~ "BJP",
+    state_name == "Tamil Nadu" ~ "Other",
+
+    # West Bengal: BJP vs TMC vs Left-Congress vs Other
+    state_name == "West Bengal" &
+      party %in% c("Bharatiya Janata Party") ~ "BJP",
+    state_name == "West Bengal" &
+      party %in% c("All India Trinamool Congress") ~ "TMC",
+    state_name == "West Bengal" &
+      party %in%
+        c(
+          "Communist Party of India (Marxist)",
+          "Communist Party of India",
+          "All India Forward Bloc",
+          "Revolutionary Socialist Party",
+          "Socialist Unity Centre of India (Communist)",
+          "Indian National Congress"
+        ) ~ "Left-Congress",
+    state_name == "West Bengal" ~ "Other",
+
+    TRUE ~ "Other"
+  )
+}
+
 state_map_path <- function(state_name) {
   folder <- case_when(
     state_name == "Assam" ~ "assam",
@@ -86,7 +225,7 @@ state_map_path <- function(state_name) {
     state_name == "West Bengal" ~ "westbengal",
     TRUE ~ NA_character_
   )
-  file.path(repo_root, "maps", folder, paste0(folder, ".assembly.shp"))
+  file.path(repo_root, "geo", "maps", folder, paste0(folder, ".assembly.shp"))
 }
 
 constituency_region <- function(state_name, constituency_name, lon, lat) {
@@ -114,8 +253,15 @@ constituency_region <- function(state_name, constituency_name, lon, lat) {
 
     state_name == "West Bengal" & lat > 25.0 ~ "North Bengal",
     state_name == "West Bengal" & lon < 87.8 & lat < 23.5 ~ "Jungle Mahal",
-    state_name == "West Bengal" & lon >= 88.0 & lon <= 88.6 & lat >= 22.2 & lat <= 22.9 ~ "Kolkata",
-    state_name == "West Bengal" & lon < 88.8 & lat >= 23.0 & lat <= 24.6 ~ "Rarh",
+    state_name == "West Bengal" &
+      lon >= 88.0 &
+      lon <= 88.6 &
+      lat >= 22.2 &
+      lat <= 22.9 ~ "Kolkata",
+    state_name == "West Bengal" &
+      lon < 88.8 &
+      lat >= 23.0 &
+      lat <= 24.6 ~ "Rarh",
     state_name == "West Bengal" ~ "South Bengal",
 
     TRUE ~ "Other"
@@ -147,7 +293,13 @@ assembly_candidate_results %>%
   ) -> may2026
 
 assembly_candidate_results %>%
-  filter(election_id %in% paste0(c("assam", "kerala", "puducherry", "tamil_nadu", "west_bengal"), "_2021")) %>%
+  filter(
+    election_id %in%
+      paste0(
+        c("assam", "kerala", "puducherry", "tamil_nadu", "west_bengal"),
+        "_2021"
+      )
+  ) %>%
   mutate(
     party = normalize_party(party),
     state_name = factor(
@@ -269,8 +421,17 @@ seat_results %>%
   ) %>%
   transmute(
     State = state_name,
-    `Seat leader` = sprintf("%s (%d/%d)", seat_leader, seat_leader_seats, seats),
-    `Vote leader` = sprintf("%s (%s)", vote_leader, percent(vote_leader_share, accuracy = 0.1)),
+    `Seat leader` = sprintf(
+      "%s (%d/%d)",
+      seat_leader,
+      seat_leader_seats,
+      seats
+    ),
+    `Vote leader` = sprintf(
+      "%s (%s)",
+      vote_leader,
+      percent(vote_leader_share, accuracy = 0.1)
+    ),
     `Median margin` = comma(median_margin),
     `Seats < 5k` = close_5k,
     `Closest seat` = comma(closest_margin),
@@ -321,7 +482,9 @@ may2026_alliance %>%
     margin = if (n() >= 2) winner_votes - runnerup_votes else NA_real_,
     corners = safe_corners(total_votes),
     .groups = "drop"
-  ) -> alliance_results
+  ) %>%
+  # Falta (West Bengal) election postponed; all candidates have 0 votes
+  filter(constituency_name != "Falta") -> alliance_results
 
 alliance_results %>%
   count(state_name, winner_alliance, name = "seats") %>%
@@ -473,7 +636,13 @@ contest_corners %>%
 
 contest_corners %>%
   filter(corners == 2) %>%
-  count(batch, state_name, winner_alliance, runnerup_alliance, sort = TRUE) -> two_corner_outcomes
+  count(
+    batch,
+    state_name,
+    winner_alliance,
+    runnerup_alliance,
+    sort = TRUE
+  ) -> two_corner_outcomes
 
 focus_alliances <- list(
   "Assam" = c("NDA", "INDIA"),
@@ -506,8 +675,17 @@ state_region_lookup %>%
 alliance_summary %>%
   transmute(
     State = state_name,
-    `Seat leader` = sprintf("%s (%d/%d)", seat_leader, seat_leader_seats, seats),
-    `Vote leader` = sprintf("%s (%s)", vote_leader, percent(vote_leader_share, accuracy = 0.1)),
+    `Seat leader` = sprintf(
+      "%s (%d/%d)",
+      seat_leader,
+      seat_leader_seats,
+      seats
+    ),
+    `Vote leader` = sprintf(
+      "%s (%s)",
+      vote_leader,
+      percent(vote_leader_share, accuracy = 0.1)
+    ),
     `Median margin` = comma(median_margin),
     `Seats < 5k` = close_5k,
     `Closest seat` = comma(closest_margin),
@@ -526,8 +704,11 @@ state_swing %>%
   ) %>%
   ggplot(aes(x = vote_share_pp, y = alliance, fill = vote_share_pp > 0)) +
   geom_col(width = 0.7) +
-  facet_wrap(~ state_name, scales = "free_y", ncol = 1) +
-  scale_fill_manual(values = c("TRUE" = "#5f3946", "FALSE" = "#9c9280"), guide = "none") +
+  facet_wrap(~state_name, scales = "free_y", ncol = 1) +
+  scale_fill_manual(
+    values = c("TRUE" = "#5f3946", "FALSE" = "#9c9280"),
+    guide = "none"
+  ) +
   geom_vline(xintercept = 0, colour = "#3C3C3C", linewidth = 0.3) +
   labs(
     title = "Alliance vote-share swing from 2021 to 2026",
@@ -538,55 +719,62 @@ state_swing %>%
   theme_elections()
 ```
 
-```{r constituency-map-margin, fig.width=10, fig.height=9}
-assembly_shapes %>%
+```{r constituency-map-margin, fig.width=12, fig.height=10}
+library(patchwork)
+
+map_states <- c("Assam", "Kerala", "Tamil Nadu", "West Bengal")
+
+map_data <- assembly_shapes %>%
+  filter(state_name %in% map_states) %>%
   left_join(
-    alliance_results %>%
-      select(state_name, constituency_no, margin, corners),
+    alliance_results %>% select(state_name, constituency_no, margin, corners),
     by = c("state_name", "constituency_no")
-  ) %>%
-  ggplot(aes(fill = margin)) +
-  geom_sf(colour = "#e5e1d8", linewidth = 0.12) +
-  facet_wrap(~ state_name, ncol = 1, scales = "free") +
-  scale_fill_gradient(
-    low = "#efe8dd",
-    high = "#5f3946",
-    trans = "sqrt",
-    labels = comma,
-    na.value = "#d8d1c4"
-  ) +
-  labs(
+  )
+
+map(map_states, function(st) {
+  map_data %>%
+    filter(state_name == st) %>%
+    ggplot(aes(fill = margin)) +
+    geom_sf(colour = "#e5e1d8", linewidth = 0.12) +
+    scale_fill_gradient(
+      low = "#efe8dd",
+      high = "#5f3946",
+      trans = "sqrt",
+      labels = comma,
+      na.value = "#d8d1c4"
+    ) +
+    labs(title = st, fill = "Margin") +
+    theme_elections() +
+    theme(legend.position = "bottom")
+}) %>%
+  wrap_plots(ncol = 2) +
+  plot_annotation(
     title = "Constituency-level winning margins",
-    subtitle = "Darker constituencies are safer; pale constituencies are closer fights",
-    fill = "Margin"
-  ) +
-  theme_elections() +
-  theme(legend.position = "bottom")
+    subtitle = "Darker constituencies are safer; pale constituencies are closer fights"
+  )
 ```
 
-```{r constituency-map-corners, fig.width=10, fig.height=9}
-assembly_shapes %>%
-  left_join(
-    alliance_results %>%
-      select(state_name, constituency_no, margin, corners),
-    by = c("state_name", "constituency_no")
-  ) %>%
-  ggplot(aes(fill = corners)) +
-  geom_sf(colour = "#e5e1d8", linewidth = 0.12) +
-  facet_wrap(~ state_name, ncol = 1, scales = "free") +
-  scale_fill_gradient(
-    low = "#f1ebe1",
-    high = "#7b3f55",
-    labels = number_format(accuracy = 0.1),
-    na.value = "#d8d1c4"
-  ) +
-  labs(
+```{r constituency-map-corners, fig.width=12, fig.height=10}
+map(map_states, function(st) {
+  map_data %>%
+    filter(state_name == st) %>%
+    ggplot(aes(fill = corners)) +
+    geom_sf(colour = "#e5e1d8", linewidth = 0.12) +
+    scale_fill_gradient(
+      low = "#f1ebe1",
+      high = "#7b3f55",
+      labels = number_format(accuracy = 0.1),
+      na.value = "#d8d1c4"
+    ) +
+    labs(title = st, fill = "Corners") +
+    theme_elections() +
+    theme(legend.position = "bottom")
+}) %>%
+  wrap_plots(ncol = 2) +
+  plot_annotation(
     title = "Constituency-level contest fragmentation",
-    subtitle = "Higher values mean more crowded and less binary contests",
-    fill = "Corners"
-  ) +
-  theme_elections() +
-  theme(legend.position = "bottom")
+    subtitle = "Higher values mean more crowded and less binary contests"
+  )
 ```
 
 ## Contest corners
@@ -603,7 +791,7 @@ corner_distribution %>%
   ) %>%
   ggplot(aes(x = corners, y = seats, fill = batch)) +
   geom_col(position = position_dodge(width = 0.75), width = 0.65) +
-  facet_wrap(~ state_name, scales = "free_y", ncol = 1) +
+  facet_wrap(~state_name, scales = "free_y", ncol = 1) +
   scale_fill_manual(values = c("2021" = "#9c9280", "2026" = "#5f3946")) +
   labs(
     title = "Contest corners by state",
@@ -656,7 +844,7 @@ alliance_tally %>%
   ggplot(aes(x = seats, y = winner_alliance)) +
   geom_col(fill = "#5f3946") +
   geom_text(aes(label = seats), hjust = -0.15, size = 3, colour = "#3C3C3C") +
-  facet_wrap(~ state_name, scales = "free_y", ncol = 1) +
+  facet_wrap(~state_name, scales = "free_y", ncol = 1) +
   scale_x_continuous(expand = expansion(mult = c(0, 0.15))) +
   labs(
     title = "Winning alliances by state",
@@ -670,7 +858,17 @@ alliance_tally %>%
 ```{r close-overall, echo=FALSE}
 alliance_results %>%
   arrange(margin, state_name, constituency_no) %>%
-  select(state_name, constituency_name, winner, winner_alliance, runnerup, runnerup_alliance, winner_votes, runnerup_votes, margin) %>%
+  select(
+    state_name,
+    constituency_name,
+    winner,
+    winner_alliance,
+    runnerup,
+    runnerup_alliance,
+    winner_votes,
+    runnerup_votes,
+    margin
+  ) %>%
   slice_head(n = 10) %>%
   mutate(
     `Winner` = paste0(winner, " (", winner_alliance, ")"),
@@ -679,10 +877,18 @@ alliance_results %>%
     `Runner-up votes` = comma(runnerup_votes),
     `Margin` = comma(margin)
   ) %>%
-  select(State = state_name, Constituency = constituency_name, Winner, `Runner-up`, `Winner votes`, `Runner-up votes`, Margin)
+  select(
+    State = state_name,
+    Constituency = constituency_name,
+    Winner,
+    `Runner-up`,
+    `Winner votes`,
+    `Runner-up votes`,
+    Margin
+  )
 ```
 
-Falta in West Bengal is the odd one out: the source records the top two candidates on equal votes, so it behaves like a true tie in the table above.
+Falta in West Bengal has been excluded: the election was postponed and all candidates are recorded with 0 votes.
 
 ## Alliance Notes
 
@@ -758,7 +964,10 @@ for (st in levels(may2026$state_name)) {
 
   cat("Regional swing hotspots:\n\n")
   region_swing %>%
-    filter(state_name == st, alliance %in% focus_alliances[[as.character(st)]]) %>%
+    filter(
+      state_name == st,
+      alliance %in% focus_alliances[[as.character(st)]]
+    ) %>%
     arrange(desc(abs(vote_share_pp))) %>%
     slice_head(n = 6) %>%
     transmute(
@@ -781,7 +990,7 @@ for (st in levels(may2026$state_name)) {
       `Avg corners` = round(avg_corners, 1),
       `Median margin` = comma(median_margin),
       `Seats < 5k` = close_5k
-  ) %>%
+    ) %>%
     print()
   cat("\n\n")
 

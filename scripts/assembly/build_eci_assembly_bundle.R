@@ -2,14 +2,49 @@ require(tidyverse)
 require(arrow)
 require(readxl)
 
-bundle_dir <- "assembly"
+find_script_path <- function() {
+  file_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
+  if (length(file_arg) > 0) {
+    return(normalizePath(sub("^--file=", "", file_arg[[1]]), mustWork = TRUE))
+  }
+
+  frame_file <- sys.frames()[[1]]$ofile
+  normalizePath(if (is.null(frame_file)) getwd() else frame_file, mustWork = FALSE)
+}
+
+find_repo_root <- function(start_path) {
+  current <- normalizePath(start_path, mustWork = TRUE)
+  if (!dir.exists(current)) {
+    current <- dirname(current)
+  }
+
+  repeat {
+    if (file.exists(file.path(current, "README.md")) &&
+        dir.exists(file.path(current, "assembly"))) {
+      return(current)
+    }
+
+    parent <- dirname(current)
+    if (identical(parent, current)) {
+      stop("Could not locate repo root from script path.")
+    }
+    current <- parent
+  }
+}
+
+script_path <- find_script_path()
+script_dir <- dirname(script_path)
+repo_root <- find_repo_root(script_dir)
+legacy_dir <- file.path(repo_root, "legacy", "_flat_compat")
+bundle_dir <- file.path(repo_root, "assembly")
 data_dir <- file.path(bundle_dir, "data")
 scripts_dir <- file.path(bundle_dir, "scripts")
-manifest_path <- "eci_assembly_manifest_2021_2026.csv"
-current_results_dir <- "eci_assembly_results"
+manifest_path <- file.path(script_dir, "eci_assembly_manifest_2021_2026.csv")
+current_results_dir <- file.path(repo_root, "data", "assembly", "raw", "eci_assembly_results")
 
 dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(scripts_dir, recursive = TRUE, showWarnings = FALSE)
+setwd(legacy_dir)
 
 safe_num <- function(x) {
   x %>%
@@ -741,8 +776,8 @@ save(
   file = file.path(data_dir, "assembly_candidate_results_since_2009.RData")
 )
 
-file.copy("download_eci_assembly_results.R", file.path(scripts_dir, "download_eci_assembly_results.R"), overwrite = TRUE)
-file.copy("build_eci_assembly_bundle.R", file.path(scripts_dir, "build_eci_assembly_bundle.R"), overwrite = TRUE)
+file.copy(file.path(script_dir, "download_eci_assembly_results.R"), file.path(scripts_dir, "download_eci_assembly_results.R"), overwrite = TRUE)
+file.copy(file.path(script_dir, "build_eci_assembly_bundle.R"), file.path(scripts_dir, "build_eci_assembly_bundle.R"), overwrite = TRUE)
 file.copy(manifest_path, file.path(scripts_dir, "eci_assembly_manifest_2021_2026.csv"), overwrite = TRUE)
 
 covered_elections <- assembly_candidate_results %>%

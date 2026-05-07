@@ -1,13 +1,15 @@
 *
 !/.gitignore
 !/README.md
-!/build_eci_assembly_bundle.R
-!/download_eci_assembly_results.R
-!/may2026_assembly_summary.Rmd
-!/may2026_assembly_blog.md
+!/WORKSPACE_GUIDE.md
 !/assembly/
 !/assembly/**
-!/eci_assembly_manifest_2021_2026.csv
+!/legacy/
+!/legacy/README.md
+!/scripts/
+!/scripts/**
+!/docs/
+!/docs/**
 
 # Keep common local/editor clutter out of the repo.
 .Rhistory

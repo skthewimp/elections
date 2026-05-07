@@ -2,7 +2,7 @@
 
 This folder is the publishable archive for the state assembly candidate-level results available in this workspace.
 
-It is the only folder intended for distribution. The parent repository also keeps the root-level build scripts used to regenerate it.
+It is the only folder intended for distribution. The parent repository keeps the workspace build scripts under `scripts/assembly/`.
 
 It contains one canonical dataset:
 

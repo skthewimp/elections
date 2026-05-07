@@ -1,12 +1,15 @@
 # ECI Assembly Results Archive
 
-This repository packages a cleaned, publication-ready archive of Indian state assembly constituency results from `2009` through `2026`.
+This repository packages a cleaned, publication-ready archive of Indian state assembly constituency results from `2009` through `2026`, while also preserving the broader historical election workspace it was built from.
 
-The release is intentionally simple:
+If you are trying to understand the folder layout first, read `WORKSPACE_GUIDE.md`.
+
+The main active pieces are:
 
 - `assembly/` is the distributable bundle
-- `build_eci_assembly_bundle.R` rebuilds the bundle from the workspace sources
-- `download_eci_assembly_results.R` is the one-off ECI fetch helper
+- `scripts/assembly/build_eci_assembly_bundle.R` rebuilds the bundle from the workspace sources
+- `scripts/assembly/download_eci_assembly_results.R` is the one-off ECI fetch helper
+- `scripts/analysis/may2026_assembly_summary.Rmd` is the current May 2026 analysis notebook
 
 ## What is inside
 
@@ -62,10 +65,16 @@ The current bundle matches the manifest and is complete at both the election lev
 ## Rebuild
 
 ```bash
-Rscript build_eci_assembly_bundle.R
+Rscript scripts/assembly/build_eci_assembly_bundle.R
 ```
 
-The build script writes the bundle to `assembly/` and copies the release scripts into that same folder.
+The build script reads the older flat-file compatibility workspace from `legacy/_flat_compat/`, writes the bundle to `assembly/`, and copies the release scripts into `assembly/scripts/`.
+
+If you need to refresh the live ECI scrape inputs first:
+
+```bash
+Rscript scripts/assembly/download_eci_assembly_results.R
+```
 
 ## Using the data
 
@@ -81,4 +90,6 @@ arrow::read_parquet("assembly/data/assembly_candidate_results_since_2009.parquet
 
 - `parquet` is the primary exchange format
 - `.RData` is kept for compatibility with existing R workflows
-- the workspace contains many older scratch files, but only the release bundle and the two build scripts are intended for distribution
+- the wider historical workspace is now organized under `legacy/`, with `legacy/_flat_compat/` retained only as a compatibility layer for older path-dependent code
+- raw live ECI scrape outputs now live under `data/assembly/raw/eci_assembly_results/`
+- maps and other geospatial reference assets now live under `geo/`

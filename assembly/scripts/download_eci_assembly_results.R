@@ -2,8 +2,41 @@ require(tidyverse)
 require(rvest)
 require(httr)
 
-manifest_path <- "eci_assembly_manifest_2021_2026.csv"
-output_dir <- "eci_assembly_results"
+find_script_path <- function() {
+  file_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
+  if (length(file_arg) > 0) {
+    return(normalizePath(sub("^--file=", "", file_arg[[1]]), mustWork = TRUE))
+  }
+
+  frame_file <- sys.frames()[[1]]$ofile
+  normalizePath(if (is.null(frame_file)) getwd() else frame_file, mustWork = FALSE)
+}
+
+find_repo_root <- function(start_path) {
+  current <- normalizePath(start_path, mustWork = TRUE)
+  if (!dir.exists(current)) {
+    current <- dirname(current)
+  }
+
+  repeat {
+    if (file.exists(file.path(current, "README.md")) &&
+        dir.exists(file.path(current, "assembly"))) {
+      return(current)
+    }
+
+    parent <- dirname(current)
+    if (identical(parent, current)) {
+      stop("Could not locate repo root from script path.")
+    }
+    current <- parent
+  }
+}
+
+script_path <- find_script_path()
+script_dir <- dirname(script_path)
+repo_root <- find_repo_root(script_dir)
+manifest_path <- file.path(script_dir, "eci_assembly_manifest_2021_2026.csv")
+output_dir <- file.path(repo_root, "data", "assembly", "raw", "eci_assembly_results")
 
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
